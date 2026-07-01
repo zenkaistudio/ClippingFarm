@@ -1,0 +1,16 @@
+{
+  "num_clips": 6,
+  "clip_length_seconds": {
+    "min": 20,
+    "max": 60
+  },
+  "whisper_model": "mlx-community/whisper-medium-mlx",
+  "output_resolution": {
+    "width": 1080,
+    "height": 1920
+  },
+  "crop_mode": "center",
+  "crop_offset_x": 0,
+  "caption_font": "assets/fonts/Anton-Regular.ttf",
+  "claude_model": "claude-sonnet-4-6"
+}

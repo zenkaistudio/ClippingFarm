@@ -1,0 +1,5 @@
+anthropic>=0.40.0
+mlx-whisper>=0.4.3
+mlx>=0.20.0
+opencv-python-headless>=4.10.0
+python-dotenv>=1.0.0

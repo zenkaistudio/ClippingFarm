@@ -1,0 +1,17 @@
+venv/
+.env
+config.json
+input/
+work/
+output/
+__pycache__/
+*.pyc
+.DS_Store
+yt downloads/
+*.mp4
+*.mp3
+*.wav
+*.mov
+*.heic
+*.png
+*.jpg
