@@ -1,5 +1,9 @@
 anthropic>=0.40.0
-mlx-whisper>=0.4.3
-mlx>=0.20.0
 opencv-python-headless>=4.10.0
 python-dotenv>=1.0.0
+flask>=3.0.0
+faster-whisper>=1.0.3; sys_platform != "darwin"
+nvidia-cublas-cu12; sys_platform == "win32"
+nvidia-cudnn-cu12; sys_platform == "win32"
+mlx-whisper>=0.4.3; sys_platform == "darwin"
+mlx>=0.20.0; sys_platform == "darwin"

@@ -123,7 +123,7 @@ def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[
 
         ass_content = build_ass(words, candidate["hook_title"], clip_duration, width, height)
         ass_path = clip_dir / "captions.ass"
-        ass_path.write_text(ass_content)
+        ass_path.write_text(ass_content, encoding="utf-8")
 
         final_path = clip_dir / "final.mp4"
         ffmpeg_utils.burn_ass(clip_dir / "vertical.mp4", ass_path, final_path)

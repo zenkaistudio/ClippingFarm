@@ -3,11 +3,12 @@ import shutil
 import subprocess
 from pathlib import Path
 
-_FFMPEG_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg")
-_FFPROBE_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffprobe")
+_BUNDLED_DIR = Path(__file__).resolve().parent.parent / "tools" / "ffmpeg" / "bin"
+_FFMPEG_BUNDLED = _BUNDLED_DIR / "ffmpeg.exe"
+_FFPROBE_BUNDLED = _BUNDLED_DIR / "ffprobe.exe"
 
-FFMPEG = str(_FFMPEG_FULL) if _FFMPEG_FULL.exists() else "ffmpeg"
-FFPROBE = str(_FFPROBE_FULL) if _FFPROBE_FULL.exists() else "ffprobe"
+FFMPEG = str(_FFMPEG_BUNDLED) if _FFMPEG_BUNDLED.exists() else "ffmpeg"
+FFPROBE = str(_FFPROBE_BUNDLED) if _FFPROBE_BUNDLED.exists() else "ffprobe"
 
 
 def _run(cmd: list[str]) -> None:
@@ -71,7 +72,17 @@ def crop_vertical(in_path: Path, out_path: Path, width: int, height: int, offset
     _run(cmd)
 
 
+def _escape_filter_path(path: Path) -> str:
+    # ffmpeg's filtergraph parser treats ':' and '\' as special characters, so a raw
+    # Windows path like "C:\foo\bar.ass" gets mangled when passed straight into a
+    # filter option. Use forward slashes, escape the drive-letter colon, and wrap the
+    # whole thing in single quotes via the explicit filename= key (the ass filter's own
+    # positional-arg parser otherwise still splits on the escaped colon).
+    escaped = str(path).replace("\\", "/").replace(":", "\\:")
+    return f"filename='{escaped}'"
+
+
 def burn_ass(in_path: Path, ass_path: Path, out_path: Path) -> None:
-    vf = f"ass={ass_path}"
+    vf = f"ass={_escape_filter_path(ass_path)}"
     cmd = [FFMPEG, "-y", "-i", str(in_path), "-vf", vf, "-c:a", "copy", str(out_path)]
     _run(cmd)

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClippingFarm &mdash; Master Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="grain"></div>
+<div class="scanlines"></div>
+
+<header class="deck">
+  <div class="deck__brand">
+    <span class="deck__mark">CF</span>
+    <div class="deck__wordmark">
+      <h1>CLIPPING<span>FARM</span></h1>
+      <p>master control &mdash; VOD to viral, one pass at a time</p>
+    </div>
+  </div>
+  <div class="deck__tally" id="tally">
+    <span class="deck__tally-dot"></span>
+    <span class="deck__tally-label">STANDBY</span>
+  </div>
+</header>
+
+<main class="stage">
+
+  <section class="drop-rail">
+    <form id="upload-form">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept="video/*" hidden>
+        <div class="dropzone__inner">
+          <svg class="dropzone__icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 3v12m0 0-4-4m4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M4 16v2a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="dropzone__title">DROP VOD TO ROLL TAPE</p>
+          <p class="dropzone__sub">or click to browse &mdash; joins the queue instantly</p>
+        </div>
+        <div class="dropzone__glow"></div>
+      </div>
+
+      <div class="rail-controls">
+        <label class="stepper" for="num-clips">
+          <span class="stepper__label">CLIPS / VOD</span>
+          <div class="stepper__control">
+            <button type="button" class="stepper__btn" id="clips-dec" aria-label="Decrease">&minus;</button>
+            <input type="number" id="num-clips" min="1" max="20" value="{{ default_num_clips }}">
+            <button type="button" class="stepper__btn" id="clips-inc" aria-label="Increase">+</button>
+          </div>
+        </label>
+        <div class="upload-flash" id="upload-flash"></div>
+      </div>
+    </form>
+  </section>
+
+  <section class="board">
+
+    <div class="panel panel--processing">
+      <h2 class="panel__title"><span class="panel__title-index">01</span> NOW PROCESSING</h2>
+
+      <div id="processing-empty" class="empty-state">
+        <p>Standing by. Nothing on the deck &mdash; drop a VOD above to start rolling.</p>
+      </div>
+
+      <div id="processing-active" class="processing hidden">
+        <p class="processing__filename" id="processing-filename">&mdash;</p>
+
+        <div class="track" id="stage-track"></div>
+
+        <div class="error-log hidden" id="error-log">
+          <span class="error-log__tag">STAGE FAULT</span>
+          <span class="error-log__msg" id="error-log-msg"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel panel--queue">
+      <h2 class="panel__title"><span class="panel__title-index">02</span> RUNDOWN / QUEUE</h2>
+      <ol class="queue-list" id="queue-list">
+        <li class="queue-empty">Queue is clear.</li>
+      </ol>
+    </div>
+
+  </section>
+
+  <section class="panel panel--gallery">
+    <h2 class="panel__title"><span class="panel__title-index">03</span> FINISHED CLIPS</h2>
+    <div id="gallery-empty" class="empty-state">
+      <p>Nothing's landed in the export bin yet. First finished clips will show up here.</p>
+    </div>
+    <div id="gallery" class="gallery"></div>
+  </section>
+
+</main>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

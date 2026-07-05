@@ -1,7 +1,11 @@
 venv/
 .env
+tools/youtube_cookies.txt
+tools/ffmpeg/
+tools/certs/
 config.json
 input/
+uploads/
 work/
 output/
 __pycache__/
