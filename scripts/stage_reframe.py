@@ -6,7 +6,7 @@ import state
 
 
 def run(video_id: str, clip_ids: list[str], width: int, height: int, offset_x: int = 0,
-        crop_mode: str = "center", force: bool = False) -> None:
+        crop_mode: str = "center", bg_fill: str = "none", force: bool = False) -> None:
     if not force and state.stage_done(video_id, "reframe"):
         return
 
@@ -23,7 +23,12 @@ def run(video_id: str, clip_ids: list[str], width: int, height: int, offset_x: i
             tracked = face_tracking.crop_with_face_tracking(raw_path, vertical_path, width, height)
 
         if not tracked:
-            ffmpeg_utils.crop_vertical(raw_path, vertical_path, width, height, offset_x)
+            if bg_fill == "blurred_sides":
+                ffmpeg_utils.crop_vertical_blurred_sides(raw_path, vertical_path, width, height, offset_x)
+            elif bg_fill == "blurred_letterbox":
+                ffmpeg_utils.crop_vertical_blurred_letterbox(raw_path, vertical_path, width, height)
+            else:
+                ffmpeg_utils.crop_vertical(raw_path, vertical_path, width, height, offset_x)
 
     state.set_stage_status(video_id, "reframe", "done")
 

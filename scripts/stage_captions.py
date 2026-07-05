@@ -16,6 +16,7 @@ ScaledBorderAndShadow: yes
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Caption,Arial Black,{caption_fontsize},&H0000FFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,5,2,2,40,40,{caption_margin_v},1
 Style: Title,Arial Black,{title_fontsize},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,5,2,8,40,40,{title_margin_v},1
+Style: Watermark,Arial Black,{watermark_fontsize},&H99FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,3,20,20,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -106,23 +107,33 @@ def _slugify(text: str) -> str:
     return slug[:50]
 
 
-def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: int, height: int) -> str:
+def _watermark_dialogue(text: str, clip_duration: float) -> str:
+    return f"Dialogue: 0,{_ass_time(0)},{_ass_time(clip_duration)},Watermark,,0,0,0,,{_escape(text)}"
+
+
+def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: int, height: int,
+              watermark_text: str = "") -> str:
     caption_fontsize = max(36, width // 14)
     title_fontsize = max(40, width // 12)
+    watermark_fontsize = max(24, width // 36)
     header = ASS_HEADER.format(
         width=width,
         height=height,
         caption_fontsize=caption_fontsize,
         title_fontsize=title_fontsize,
+        watermark_fontsize=watermark_fontsize,
         caption_margin_v=int(height * 0.12),
         title_margin_v=int(height * 0.08),
     )
-    body = "\n".join([_title_dialogue(hook_title, clip_duration)] + _caption_dialogues(words))
+    dialogues = [_title_dialogue(hook_title, clip_duration)] + _caption_dialogues(words)
+    if watermark_text:
+        dialogues.append(_watermark_dialogue(watermark_text, clip_duration))
+    body = "\n".join(dialogues)
     return header + body + "\n"
 
 
 def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[str],
-        width: int, height: int, force: bool = False) -> list[Path]:
+        width: int, height: int, watermark_text: str = "", force: bool = False) -> list[Path]:
     work_dir = state.work_dir_for(video_id)
     output_dir = state.ROOT / "output"
     output_dir.mkdir(exist_ok=True)
@@ -138,7 +149,8 @@ def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[
         clip_duration = candidate["end"] - candidate["start"]
         words = _words_for_clip(transcript, candidate["start"], candidate["end"])
 
-        ass_content = build_ass(words, candidate["hook_title"], clip_duration, width, height)
+        ass_content = build_ass(words, candidate["hook_title"], clip_duration, width, height,
+                                watermark_text=watermark_text)
         ass_path = clip_dir / "captions.ass"
         ass_path.write_text(ass_content, encoding="utf-8")
 

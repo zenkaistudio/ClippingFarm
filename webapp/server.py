@@ -47,6 +47,8 @@ def _process_job(job: dict) -> None:
     height = config["output_resolution"]["height"]
     offset_x = config.get("crop_offset_x", 0)
     crop_mode = config.get("crop_mode", "center")
+    bg_fill = config.get("bg_fill", "none")
+    watermark_text = config.get("watermark_text", "")
 
     with lock:
         dashboard_state["current"] = {
@@ -74,10 +76,11 @@ def _process_job(job: dict) -> None:
         clip_ids = stage_cut_clips.run(video_id, video_path, candidates)
 
         set_stage("reframe")
-        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode)
+        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode, bg_fill=bg_fill)
 
         set_stage("captions")
-        final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height)
+        final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
+                                         watermark_text=watermark_text)
 
         clips = [
             {

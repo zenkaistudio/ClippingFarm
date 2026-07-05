@@ -6,9 +6,18 @@ from pathlib import Path
 _BUNDLED_DIR = Path(__file__).resolve().parent.parent / "tools" / "ffmpeg" / "bin"
 _FFMPEG_BUNDLED = _BUNDLED_DIR / "ffmpeg.exe"
 _FFPROBE_BUNDLED = _BUNDLED_DIR / "ffprobe.exe"
+_FFMPEG_MACOS_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg")
+_FFPROBE_MACOS_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffprobe")
 
-FFMPEG = str(_FFMPEG_BUNDLED) if _FFMPEG_BUNDLED.exists() else "ffmpeg"
-FFPROBE = str(_FFPROBE_BUNDLED) if _FFPROBE_BUNDLED.exists() else "ffprobe"
+if _FFMPEG_BUNDLED.exists():
+    FFMPEG = str(_FFMPEG_BUNDLED)
+    FFPROBE = str(_FFPROBE_BUNDLED)
+elif _FFMPEG_MACOS_FULL.exists():
+    FFMPEG = str(_FFMPEG_MACOS_FULL)
+    FFPROBE = str(_FFPROBE_MACOS_FULL)
+else:
+    FFMPEG = "ffmpeg"
+    FFPROBE = "ffprobe"
 
 
 def _run(cmd: list[str]) -> None:
@@ -69,6 +78,61 @@ def crop_vertical(in_path: Path, out_path: Path, width: int, height: int, offset
         f"crop={width}:{height}:(in_w-{width})/2+{offset_x}:0"
     )
     cmd = [FFMPEG, "-y", "-i", str(in_path), "-vf", vf, "-c:a", "copy", str(out_path)]
+    _run(cmd)
+
+
+def crop_vertical_blurred_sides(in_path: Path, out_path: Path, width: int, height: int,
+                                offset_x: int = 0) -> None:
+    """
+    Template A — blurred side bars.
+    FG: 9:16 crop at 88% of frame width, centered horizontally.
+    BG: same source blurred + zoomed to fill the full 1080x1920 frame.
+    Thin blurred bars visible on left and right of the main content.
+    """
+    fg_w = (int(width * 0.88) // 2) * 2  # must be even
+    side = (width - fg_w) // 2
+    vf = (
+        f"[0:v]scale=-2:{height},"
+        f"crop={width}:{height}:(iw-{width})/2+{offset_x}:0,"
+        f"boxblur=30:3[bg];"
+        f"[0:v]scale=-2:{height},"
+        f"crop={fg_w}:{height}:(iw-{fg_w})/2+{offset_x}:0[fg];"
+        f"[bg][fg]overlay={side}:0[v]"
+    )
+    cmd = [
+        FFMPEG, "-y", "-i", str(in_path),
+        "-filter_complex", vf,
+        "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-c:a", "aac",
+        str(out_path),
+    ]
+    _run(cmd)
+
+
+def crop_vertical_blurred_letterbox(in_path: Path, out_path: Path, width: int, height: int,
+                                     zoom: float = 1.15) -> None:
+    """
+    Template B — blurred top/bottom bars (letterbox).
+    FG: full 16:9 source scaled to fit width, centered vertically — entire frame visible.
+    BG: same source zoomed 15% beyond frame and blurred to fill the full portrait canvas.
+    The blurred zones above and below the main content are available for text overlays.
+    """
+    bg_h = int(height * zoom)
+    vf = (
+        f"[0:v]scale=-2:{bg_h},"
+        f"crop={width}:{height}:(iw-{width})/2:(ih-{height})/2,"
+        f"boxblur=30:3[bg];"
+        f"[0:v]scale={width}:-2[fgs];"
+        f"[fgs]pad={width}:{height}:0:(oh-ih)/2[fg];"
+        f"[bg][fg]overlay=0:0[v]"
+    )
+    cmd = [
+        FFMPEG, "-y", "-i", str(in_path),
+        "-filter_complex", vf,
+        "-map", "[v]", "-map", "0:a?",
+        "-c:v", "libx264", "-c:a", "aac",
+        str(out_path),
+    ]
     _run(cmd)
 
 

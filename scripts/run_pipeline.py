@@ -44,6 +44,8 @@ def main():
     height = config["output_resolution"]["height"]
     offset_x = config.get("crop_offset_x", 0)
     crop_mode = config.get("crop_mode", "center")
+    bg_fill = config.get("bg_fill", "none")
+    watermark_text = config.get("watermark_text", "")
 
     video_path = resolve_input(args.input)
     video_id = state.video_id_for(video_path)
@@ -82,7 +84,7 @@ def main():
             candidates = json.loads((work_dir / "candidates.json").read_text())
         if clip_ids is None:
             clip_ids = [f"clip{i + 1:02d}" for i in range(len(candidates))]
-        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode, force=args.force)
+        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode, bg_fill=bg_fill, force=args.force)
         print(f"[reframe] reframed {len(clip_ids)} clips")
 
     if "captions" in stages_to_run:
@@ -92,7 +94,8 @@ def main():
             candidates = json.loads((work_dir / "candidates.json").read_text())
         if clip_ids is None:
             clip_ids = [f"clip{i + 1:02d}" for i in range(len(candidates))]
-        final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height, force=args.force)
+        final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
+                                         watermark_text=watermark_text, force=args.force)
         print(f"[captions] wrote {len(final_paths)} final clips:")
         for p in final_paths:
             print(f"  {p}")
