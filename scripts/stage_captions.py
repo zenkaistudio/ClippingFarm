@@ -80,18 +80,35 @@ def _caption_dialogues(words: list[dict]) -> list[str]:
     return lines
 
 
+def _render_title_with_emphasis(hook_title: str) -> str:
+    # Wraps *word* spans from the hook_title (see prompts/moment_detection.md) in bold +
+    # highlight-color ASS override tags, matching the karaoke caption highlight color.
+    parts = re.split(r"\*(.+?)\*", hook_title)
+    rendered = []
+    for i, part in enumerate(parts):
+        if not part:
+            continue
+        escaped = _escape(part)
+        if i % 2 == 1:
+            rendered.append(f"{{\\b1\\c&H0000FFFF&}}{escaped}{{\\b0\\c&H00FFFFFF&}}")
+        else:
+            rendered.append(escaped)
+    return "".join(rendered)
+
+
 def _title_dialogue(hook_title: str, clip_duration: float) -> str:
-    return f"Dialogue: 0,{_ass_time(0)},{_ass_time(clip_duration)},Title,,0,0,0,,{_escape(hook_title)}"
+    text = _render_title_with_emphasis(hook_title)
+    return f"Dialogue: 0,{_ass_time(0)},{_ass_time(clip_duration)},Title,,0,0,0,,{text}"
 
 
 def _slugify(text: str) -> str:
-    slug = re.sub(r"[^a-zA-Z0-9]+", "_", text).strip("_").lower()
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", text.replace("*", "")).strip("_").lower()
     return slug[:50]
 
 
 def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: int, height: int) -> str:
     caption_fontsize = max(36, width // 14)
-    title_fontsize = max(32, width // 16)
+    title_fontsize = max(40, width // 12)
     header = ASS_HEADER.format(
         width=width,
         height=height,

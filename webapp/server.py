@@ -46,6 +46,7 @@ def _process_job(job: dict) -> None:
     width = config["output_resolution"]["width"]
     height = config["output_resolution"]["height"]
     offset_x = config.get("crop_offset_x", 0)
+    crop_mode = config.get("crop_mode", "center")
 
     with lock:
         dashboard_state["current"] = {
@@ -73,7 +74,7 @@ def _process_job(job: dict) -> None:
         clip_ids = stage_cut_clips.run(video_id, video_path, candidates)
 
         set_stage("reframe")
-        stage_reframe.run(video_id, clip_ids, width, height, offset_x)
+        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode)
 
         set_stage("captions")
         final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height)
@@ -81,7 +82,7 @@ def _process_job(job: dict) -> None:
         clips = [
             {
                 "filename": path.name,
-                "hook_title": candidate.get("hook_title", ""),
+                "hook_title": candidate.get("hook_title", "").replace("*", ""),
                 "category": candidate.get("category", ""),
                 "virality_score": candidate.get("virality_score", 0),
             }

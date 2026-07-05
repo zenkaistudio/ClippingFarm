@@ -43,6 +43,7 @@ def main():
     width = config["output_resolution"]["width"]
     height = config["output_resolution"]["height"]
     offset_x = config.get("crop_offset_x", 0)
+    crop_mode = config.get("crop_mode", "center")
 
     video_path = resolve_input(args.input)
     video_id = state.video_id_for(video_path)
@@ -81,7 +82,7 @@ def main():
             candidates = json.loads((work_dir / "candidates.json").read_text())
         if clip_ids is None:
             clip_ids = [f"clip{i + 1:02d}" for i in range(len(candidates))]
-        stage_reframe.run(video_id, clip_ids, width, height, offset_x, force=args.force)
+        stage_reframe.run(video_id, clip_ids, width, height, offset_x, crop_mode=crop_mode, force=args.force)
         print(f"[reframe] reframed {len(clip_ids)} clips")
 
     if "captions" in stages_to_run:

@@ -3,6 +3,7 @@ venv/
 tools/youtube_cookies.txt
 tools/ffmpeg/
 tools/certs/
+models/
 config.json
 input/
 uploads/

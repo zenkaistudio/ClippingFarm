@@ -14,7 +14,7 @@ Constraints:
 - Target clip length: {min_length}-{max_length} seconds. Prefer natural sentence/thought boundaries over arbitrary cuts — it is fine to be a few seconds outside the range if it avoids cutting off a sentence mid-thought.
 - Do not invent timestamps outside the transcript's range.
 - Avoid significant overlap between selected moments; prefer covering different parts of the stream.
-- For each moment, write a punchy, scroll-stopping hook_title (under 60 characters) that would work as on-screen text — it should make sense on its own without watching the clip first.
+- For each moment, write a punchy, scroll-stopping hook_title (under 60 characters) that would work as on-screen text — it should make sense on its own without watching the clip first. Wrap the single most important word or short phrase (the one word/phrase that carries the hook — a name, a number, the surprising part) in `*asterisks*` so it can be rendered bold and highlighted on screen. Mark exactly one span per title, and keep it short (1-3 words).
 
 Return your answer using the `select_clip_moments` tool.
 
