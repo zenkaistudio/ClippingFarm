@@ -14,13 +14,26 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Caption,Arial Black,{caption_fontsize},&H0000FFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,5,2,2,40,40,{caption_margin_v},1
+Style: Caption,Arial Black,{caption_fontsize},{highlight_color},{base_color},&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,5,2,2,40,40,{caption_margin_v},1
 Style: Title,Arial Black,{title_fontsize},&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,5,2,8,40,40,{title_margin_v},1
-Style: Watermark,Arial Black,{watermark_fontsize},&H99FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,3,20,20,20,1
+Style: Watermark,Arial Black,{watermark_fontsize},&H99FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,1,{watermark_alignment},20,20,20,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
+
+WATERMARK_ALIGNMENTS = {
+    "bottom-right": 3,
+    "bottom-left": 1,
+    "top-right": 9,
+    "top-left": 7,
+}
+
+
+def _hex_to_ass_color(hex_color: str) -> str:
+    hex_color = hex_color.lstrip("#")
+    r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
+    return f"&H00{b}{g}{r}".upper()
 
 WORDS_PER_CHUNK = 4
 PAUSE_BREAK_SECONDS = 0.6
@@ -120,7 +133,7 @@ def _strip_emoji(text: str) -> str:
     return emoji_re.sub("", text).strip()
 
 
-def _render_title_with_emphasis(hook_title: str) -> str:
+def _render_title_with_emphasis(hook_title: str, highlight_color: str) -> str:
     # Wraps *word* spans from the hook_title (see prompts/moment_detection.md) in bold +
     # highlight-color ASS override tags, matching the karaoke caption highlight color.
     parts = re.split(r"\*(.+?)\*", hook_title)
@@ -130,14 +143,14 @@ def _render_title_with_emphasis(hook_title: str) -> str:
             continue
         escaped = _escape(part)
         if i % 2 == 1:
-            rendered.append(f"{{\\b1\\c&H0000FFFF&}}{escaped}{{\\b0\\c&H00FFFFFF&}}")
+            rendered.append(f"{{\\b1\\c{highlight_color}&}}{escaped}{{\\b0\\c&H00FFFFFF&}}")
         else:
             rendered.append(escaped)
     return "".join(rendered)
 
 
-def _title_dialogue(hook_title: str, clip_duration: float) -> str:
-    text = _render_title_with_emphasis(_strip_emoji(hook_title))
+def _title_dialogue(hook_title: str, clip_duration: float, highlight_color: str) -> str:
+    text = _render_title_with_emphasis(_strip_emoji(hook_title), highlight_color)
     return f"Dialogue: 0,{_ass_time(0)},{_ass_time(clip_duration)},Title,,0,0,0,,{text}"
 
 
@@ -151,10 +164,14 @@ def _watermark_dialogue(text: str, clip_duration: float) -> str:
 
 
 def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: int, height: int,
-              watermark_text: str = "") -> str:
+              watermark_text: str = "", highlight_color: str | None = None,
+              base_color: str | None = None, watermark_position: str | None = None) -> str:
     caption_fontsize = max(36, width // 14)
     title_fontsize = max(40, width // 12)
     watermark_fontsize = max(24, width // 36)
+    highlight_ass = _hex_to_ass_color(highlight_color) if highlight_color else "&H0000FFFF"
+    base_ass = _hex_to_ass_color(base_color) if base_color else "&H00FFFFFF"
+    watermark_alignment = WATERMARK_ALIGNMENTS.get(watermark_position, 3)
     header = ASS_HEADER.format(
         width=width,
         height=height,
@@ -163,8 +180,11 @@ def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: i
         watermark_fontsize=watermark_fontsize,
         caption_margin_v=int(height * 0.27),
         title_margin_v=int(height * 0.15),
+        highlight_color=highlight_ass,
+        base_color=base_ass,
+        watermark_alignment=watermark_alignment,
     )
-    dialogues = [_title_dialogue(hook_title, clip_duration)] + _caption_dialogues(words)
+    dialogues = [_title_dialogue(hook_title, clip_duration, highlight_ass)] + _caption_dialogues(words)
     if watermark_text:
         dialogues.append(_watermark_dialogue(watermark_text, clip_duration))
     body = "\n".join(dialogues)
@@ -172,7 +192,9 @@ def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: i
 
 
 def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[str],
-        width: int, height: int, watermark_text: str = "", force: bool = False) -> list[Path]:
+        width: int, height: int, watermark_text: str = "", highlight_color: str | None = None,
+        base_color: str | None = None, watermark_position: str | None = None,
+        force: bool = False) -> list[Path]:
     work_dir = state.work_dir_for(video_id)
     output_dir = state.ROOT / "output"
     output_dir.mkdir(exist_ok=True)
@@ -189,7 +211,8 @@ def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[
         words = _words_for_clip(transcript, candidate["start"], candidate["end"])
 
         ass_content = build_ass(words, candidate["hook_title"], clip_duration, width, height,
-                                watermark_text=watermark_text)
+                                watermark_text=watermark_text, highlight_color=highlight_color,
+                                base_color=base_color, watermark_position=watermark_position)
         ass_path = clip_dir / "captions.ass"
         ass_path.write_text(ass_content, encoding="utf-8")
 

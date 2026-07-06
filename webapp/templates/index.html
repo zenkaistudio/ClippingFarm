@@ -13,13 +13,16 @@
 
 <div class="grain"></div>
 <div class="scanlines"></div>
+<div class="crt-sweep"></div>
+<div class="bg-drift bg-drift-a"></div>
+<div class="bg-drift bg-drift-b"></div>
 
 <header class="deck">
   <div class="deck__brand">
     <span class="deck__mark">CF</span>
     <div class="deck__wordmark">
       <h1>CLIPPING<span>FARM</span></h1>
-      <p>master control &mdash; VOD to viral, one pass at a time</p>
+      <p>VOD to viral</p>
     </div>
   </div>
   <div class="deck__tally" id="tally">
@@ -54,6 +57,18 @@
             <button type="button" class="stepper__btn" id="clips-inc" aria-label="Increase">+</button>
           </div>
         </label>
+
+        <label class="preset-picker" for="preset-id">
+          <span class="stepper__label">BRAND PRESET</span>
+          <select id="preset-id" class="preset-picker__select">
+            <option value="">Default (config.json)</option>
+          </select>
+        </label>
+
+        <button type="button" class="btn-jersey" id="btn-manage-presets">
+          <span>Manage Presets</span>
+        </button>
+
         <div class="upload-flash" id="upload-flash"></div>
       </div>
     </form>
@@ -105,6 +120,46 @@
   </section>
 
 </main>
+
+<div class="preset-modal hidden" id="preset-modal">
+  <div class="preset-modal__card">
+    <div class="preset-modal__header">
+      <h3>Branding Presets</h3>
+      <button type="button" class="btn-jersey btn-jersey--ghost" id="preset-modal-close"><span>Close</span></button>
+    </div>
+
+    <div class="preset-list" id="preset-list"></div>
+
+    <form id="preset-form">
+      <input type="hidden" id="preset-form-id">
+      <div class="preset-form__grid">
+        <label>Preset name
+          <input type="text" id="preset-name" placeholder="e.g. Client A" required>
+        </label>
+        <label>Watermark text
+          <input type="text" id="preset-watermark" placeholder="@handle">
+        </label>
+        <label>Watermark position
+          <select id="preset-position">
+            <option value="bottom-right">Bottom Right</option>
+            <option value="bottom-left">Bottom Left</option>
+            <option value="top-right">Top Right</option>
+            <option value="top-left">Top Left</option>
+          </select>
+        </label>
+        <label>Highlight color
+          <input type="color" id="preset-highlight" value="#ffcf00">
+        </label>
+        <label>Base text color
+          <input type="color" id="preset-base" value="#ffffff">
+        </label>
+      </div>
+      <div class="preset-form__actions">
+        <button type="submit" class="btn-jersey"><span id="preset-save-label">Save Preset</span></button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

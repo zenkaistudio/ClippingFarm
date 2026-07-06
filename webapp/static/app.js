@@ -11,6 +11,20 @@ const fileInput = document.getElementById("file-input");
 const numClipsInput = document.getElementById("num-clips");
 const uploadFlash = document.getElementById("upload-flash");
 const tally = document.getElementById("tally");
+const presetSelect = document.getElementById("preset-id");
+
+const presetModal = document.getElementById("preset-modal");
+const btnManagePresets = document.getElementById("btn-manage-presets");
+const presetModalClose = document.getElementById("preset-modal-close");
+const presetList = document.getElementById("preset-list");
+const presetForm = document.getElementById("preset-form");
+const presetFormId = document.getElementById("preset-form-id");
+const presetName = document.getElementById("preset-name");
+const presetWatermark = document.getElementById("preset-watermark");
+const presetPosition = document.getElementById("preset-position");
+const presetHighlight = document.getElementById("preset-highlight");
+const presetBase = document.getElementById("preset-base");
+const presetSaveLabel = document.getElementById("preset-save-label");
 
 const processingEmpty = document.getElementById("processing-empty");
 const processingActive = document.getElementById("processing-active");
@@ -72,6 +86,7 @@ function uploadFile(file) {
   const form = new FormData();
   form.append("video", file);
   form.append("num_clips", numClipsInput.value || "6");
+  form.append("preset_id", presetSelect.value || "");
 
   flash(`Uploading ${file.name}…`, false);
 
@@ -229,6 +244,127 @@ function poll() {
 
 poll();
 setInterval(poll, 1500);
+
+// --- branding presets ---
+
+let allPresets = [];
+
+function loadPresets() {
+  fetch("/api/presets")
+    .then((res) => res.json())
+    .then((data) => {
+      allPresets = data;
+      renderPresetSelect();
+      renderPresetList();
+    })
+    .catch(() => {});
+}
+
+function renderPresetSelect() {
+  const current = presetSelect.value;
+  presetSelect.innerHTML =
+    '<option value="">Default (config.json)</option>' +
+    allPresets
+      .map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`)
+      .join("");
+  if (allPresets.some((p) => p.id === current)) presetSelect.value = current;
+}
+
+function renderPresetList() {
+  if (!allPresets.length) {
+    presetList.innerHTML = '<p class="preset-list__empty">No presets yet — create one below.</p>';
+    return;
+  }
+  presetList.innerHTML = allPresets
+    .map(
+      (p) => `
+    <div class="preset-row">
+      <div class="preset-row__swatches">
+        <span class="preset-row__swatch" style="background:${p.caption_highlight_color}"></span>
+        <span class="preset-row__swatch" style="background:${p.caption_base_color}"></span>
+      </div>
+      <span class="preset-row__name">${escapeHtml(p.name)}</span>
+      <button type="button" class="preset-row__btn" data-edit="${p.id}">Edit</button>
+      <button type="button" class="preset-row__btn preset-row__btn--danger" data-delete="${p.id}">Delete</button>
+    </div>`
+    )
+    .join("");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function resetPresetForm() {
+  presetFormId.value = "";
+  presetName.value = "";
+  presetWatermark.value = "";
+  presetPosition.value = "bottom-right";
+  presetHighlight.value = "#ffcf00";
+  presetBase.value = "#ffffff";
+  presetSaveLabel.textContent = "Save Preset";
+}
+
+btnManagePresets.addEventListener("click", () => {
+  presetModal.classList.remove("hidden");
+});
+
+presetModalClose.addEventListener("click", () => {
+  presetModal.classList.add("hidden");
+  resetPresetForm();
+});
+
+presetModal.addEventListener("click", (e) => {
+  if (e.target === presetModal) presetModal.classList.add("hidden");
+});
+
+presetList.addEventListener("click", (e) => {
+  const editBtn = e.target.closest("[data-edit]");
+  const delBtn = e.target.closest("[data-delete]");
+
+  if (editBtn) {
+    const preset = allPresets.find((p) => p.id === editBtn.dataset.edit);
+    if (!preset) return;
+    presetFormId.value = preset.id;
+    presetName.value = preset.name;
+    presetWatermark.value = preset.watermark_text;
+    presetPosition.value = preset.watermark_position;
+    presetHighlight.value = preset.caption_highlight_color;
+    presetBase.value = preset.caption_base_color;
+    presetSaveLabel.textContent = "Update Preset";
+  }
+
+  if (delBtn) {
+    fetch(`/api/presets/${encodeURIComponent(delBtn.dataset.delete)}`, { method: "DELETE" })
+      .then(() => loadPresets());
+  }
+});
+
+presetForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const payload = {
+    id: presetFormId.value || undefined,
+    name: presetName.value.trim(),
+    watermark_text: presetWatermark.value.trim(),
+    watermark_position: presetPosition.value,
+    caption_highlight_color: presetHighlight.value,
+    caption_base_color: presetBase.value,
+  };
+  fetch("/api/presets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => res.json())
+    .then(() => {
+      resetPresetForm();
+      loadPresets();
+    });
+});
+
+loadPresets();
 
 // Schedule button — event delegation so it works after gallery re-renders
 document.addEventListener("click", (e) => {

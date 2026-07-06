@@ -1,6 +1,7 @@
 import json
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -12,6 +13,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import presets  # noqa: E402
 import state  # noqa: E402
 import stage_captions  # noqa: E402
 import stage_cut_clips  # noqa: E402
@@ -50,7 +52,12 @@ def _process_job(job: dict) -> None:
     offset_x = config.get("crop_offset_x", 0)
     crop_mode = config.get("crop_mode", "center")
     bg_fill = config.get("bg_fill", "none")
-    watermark_text = config.get("watermark_text", "")
+
+    preset = presets.get(job.get("preset_id", ""))
+    watermark_text = preset["watermark_text"] or config.get("watermark_text", "")
+    highlight_color = preset["caption_highlight_color"]
+    base_color = preset["caption_base_color"]
+    watermark_position = preset["watermark_position"]
 
     with lock:
         dashboard_state["current"] = {
@@ -82,7 +89,8 @@ def _process_job(job: dict) -> None:
 
         set_stage("captions")
         final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
-                                         watermark_text=watermark_text)
+                                         watermark_text=watermark_text, highlight_color=highlight_color,
+                                         base_color=base_color, watermark_position=watermark_position)
 
         clips = [
             {
@@ -134,6 +142,7 @@ def upload():
 
     default_num_clips = load_config().get("num_clips", 6)
     num_clips = int(request.form.get("num_clips") or default_num_clips)
+    preset_id = request.form.get("preset_id") or ""
 
     dest = UPLOADS_DIR / file.filename
     stem, suffix = dest.stem, dest.suffix
@@ -151,12 +160,44 @@ def upload():
         "video_path": dest,
         "filename": dest.name,
         "num_clips": num_clips,
+        "preset_id": preset_id,
     }
     with lock:
         dashboard_state["queued"].append({"video_id": video_id, "filename": dest.name})
     job_queue.put(job)
 
     return jsonify({"video_id": video_id, "position": job_queue.qsize()})
+
+
+@app.route("/api/presets", methods=["GET"])
+def list_presets():
+    return jsonify(presets.load_all())
+
+
+@app.route("/api/presets", methods=["POST"])
+def save_preset():
+    data = request.get_json() or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+
+    preset_id = data.get("id") or re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    preset = {
+        "id": preset_id,
+        "name": name,
+        "watermark_text": data.get("watermark_text", ""),
+        "watermark_position": data.get("watermark_position", "bottom-right"),
+        "caption_highlight_color": data.get("caption_highlight_color", "#FFCF00"),
+        "caption_base_color": data.get("caption_base_color", "#FFFFFF"),
+    }
+    presets.upsert(preset)
+    return jsonify(preset)
+
+
+@app.route("/api/presets/<preset_id>", methods=["DELETE"])
+def delete_preset(preset_id):
+    presets.delete(preset_id)
+    return jsonify({"success": True})
 
 
 @app.route("/api/status")
@@ -229,5 +270,5 @@ def _open_in_chrome(url: str) -> None:
 
 
 if __name__ == "__main__":
-    threading.Timer(1.0, lambda: _open_in_chrome("http://127.0.0.1:5000")).start()
-    app.run(host="127.0.0.1", port=5000, threaded=True)
+    threading.Timer(1.0, lambda: _open_in_chrome("http://127.0.0.1:5050")).start()
+    app.run(host="127.0.0.1", port=5050, threaded=True)
