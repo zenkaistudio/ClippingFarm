@@ -81,6 +81,45 @@ def _caption_dialogues(words: list[dict]) -> list[str]:
     return lines
 
 
+def _strip_emoji(text: str) -> str:
+    emoji_re = re.compile(
+        "[\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002702-\U000027B0"
+        "\U000024C2-\U0001F251"
+        "\U0001F900-\U0001F9FF"
+        "\U0001FA00-\U0001FA6F"
+        "\U0001FA70-\U0001FAFF"
+        "\U00002194-\U00002199"
+        "\U00002934-\U00002935"
+        "\U000025AA-\U000025FE"
+        "\U00002614-\U00002615"
+        "\U00002648-\U00002653"
+        "\U0000267F"
+        "\U00002693"
+        "\U000026A1"
+        "\U000026AA-\U000026AB"
+        "\U000026BD-\U000026BE"
+        "\U000026C4-\U000026C5"
+        "\U000026CE"
+        "\U000026D4"
+        "\U000026EA"
+        "\U000026F2-\U000026F3"
+        "\U000026F5"
+        "\U000026FA"
+        "\U000026FD"
+        "\U00002702"
+        "\U00002705"
+        "\U00002708-\U0000270D"
+        "\U0000270F"
+        "]+",
+        flags=re.UNICODE,
+    )
+    return emoji_re.sub("", text).strip()
+
+
 def _render_title_with_emphasis(hook_title: str) -> str:
     # Wraps *word* spans from the hook_title (see prompts/moment_detection.md) in bold +
     # highlight-color ASS override tags, matching the karaoke caption highlight color.
@@ -98,7 +137,7 @@ def _render_title_with_emphasis(hook_title: str) -> str:
 
 
 def _title_dialogue(hook_title: str, clip_duration: float) -> str:
-    text = _render_title_with_emphasis(hook_title)
+    text = _render_title_with_emphasis(_strip_emoji(hook_title))
     return f"Dialogue: 0,{_ass_time(0)},{_ass_time(clip_duration)},Title,,0,0,0,,{text}"
 
 
@@ -122,8 +161,8 @@ def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: i
         caption_fontsize=caption_fontsize,
         title_fontsize=title_fontsize,
         watermark_fontsize=watermark_fontsize,
-        caption_margin_v=int(height * 0.12),
-        title_margin_v=int(height * 0.08),
+        caption_margin_v=int(height * 0.27),
+        title_margin_v=int(height * 0.15),
     )
     dialogues = [_title_dialogue(hook_title, clip_duration)] + _caption_dialogues(words)
     if watermark_text:

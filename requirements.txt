@@ -2,6 +2,8 @@ anthropic>=0.40.0
 opencv-python-headless>=4.10.0
 python-dotenv>=1.0.0
 flask>=3.0.0
+cloudinary>=1.40.0
+requests>=2.31.0
 faster-whisper>=1.0.3; sys_platform != "darwin"
 nvidia-cublas-cu12; sys_platform == "win32"
 nvidia-cudnn-cu12; sys_platform == "win32"

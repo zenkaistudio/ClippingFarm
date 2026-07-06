@@ -1,4 +1,5 @@
 import json
+import os
 import queue
 import subprocess
 import sys
@@ -16,6 +17,7 @@ import stage_captions  # noqa: E402
 import stage_cut_clips  # noqa: E402
 import stage_detect_moments  # noqa: E402
 import stage_reframe  # noqa: E402
+import stage_schedule  # noqa: E402
 import stage_transcribe  # noqa: E402
 
 ROOT = state.ROOT
@@ -173,6 +175,44 @@ def status():
 @app.route("/clips/<path:filename>")
 def clips(filename):
     return send_from_directory(OUTPUT_DIR, filename)
+
+
+@app.route("/api/schedule", methods=["POST"])
+def schedule_clip():
+    data = request.get_json()
+    filename = data.get("filename")
+    hook_title = data.get("hook_title", "")
+    category = data.get("category", "highlight")
+
+    if not filename:
+        return jsonify({"error": "No filename provided"}), 400
+
+    clip_path = OUTPUT_DIR / filename
+    if not clip_path.exists():
+        return jsonify({"error": f"Clip not found: {filename}"}), 404
+
+    config = load_config()
+    channel_ids = config.get("buffer_channel_ids", [])
+    buffer_token = os.environ.get("BUFFER_ACCESS_TOKEN", "")
+    claude_model = config.get("claude_model", "claude-sonnet-4-6")
+
+    if not channel_ids:
+        return jsonify({"error": "No buffer_channel_ids in config.json"}), 400
+    if not buffer_token:
+        return jsonify({"error": "BUFFER_ACCESS_TOKEN not set in .env"}), 400
+
+    try:
+        result = stage_schedule.run(
+            clip_path=clip_path,
+            hook_title=hook_title,
+            category=category,
+            channel_ids=channel_ids,
+            buffer_token=buffer_token,
+            claude_model=claude_model,
+        )
+        return jsonify({"success": True, **result})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 def _open_in_chrome(url: str) -> None:

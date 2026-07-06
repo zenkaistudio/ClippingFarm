@@ -14,5 +14,6 @@
   "bg_fill": "blurred_letterbox",
   "watermark_text": "@DegenVaultz",
   "caption_font": "assets/fonts/Anton-Regular.ttf",
-  "claude_model": "claude-sonnet-4-6"
+  "claude_model": "claude-sonnet-4-6",
+  "buffer_channel_ids": []
 }

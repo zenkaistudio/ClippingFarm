@@ -122,9 +122,8 @@ def crop_vertical_blurred_letterbox(in_path: Path, out_path: Path, width: int, h
         f"[0:v]scale=-2:{bg_h},"
         f"crop={width}:{height}:(iw-{width})/2:(ih-{height})/2,"
         f"boxblur=30:3[bg];"
-        f"[0:v]scale={width}:-2[fgs];"
-        f"[fgs]pad={width}:{height}:0:(oh-ih)/2[fg];"
-        f"[bg][fg]overlay=0:0[v]"
+        f"[0:v]scale={width}:-2[fg];"
+        f"[bg][fg]overlay=0:(H-h)/2[v]"
     )
     cmd = [
         FFMPEG, "-y", "-i", str(in_path),
