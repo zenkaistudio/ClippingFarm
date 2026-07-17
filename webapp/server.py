@@ -13,6 +13,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+import airtable_client  # noqa: E402
 import presets  # noqa: E402
 import state  # noqa: E402
 import stage_captions  # noqa: E402
@@ -58,6 +59,7 @@ def _process_job(job: dict) -> None:
     highlight_color = preset["caption_highlight_color"]
     base_color = preset["caption_base_color"]
     watermark_position = preset["watermark_position"]
+    title_enabled = job.get("title_enabled", True)
 
     with lock:
         dashboard_state["current"] = {
@@ -90,7 +92,8 @@ def _process_job(job: dict) -> None:
         set_stage("captions")
         final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
                                          watermark_text=watermark_text, highlight_color=highlight_color,
-                                         base_color=base_color, watermark_position=watermark_position)
+                                         base_color=base_color, watermark_position=watermark_position,
+                                         title_enabled=title_enabled)
 
         clips = [
             {
@@ -143,6 +146,7 @@ def upload():
     default_num_clips = load_config().get("num_clips", 6)
     num_clips = int(request.form.get("num_clips") or default_num_clips)
     preset_id = request.form.get("preset_id") or ""
+    title_enabled = (request.form.get("title_enabled") or "true").lower() != "false"
 
     dest = UPLOADS_DIR / file.filename
     stem, suffix = dest.stem, dest.suffix
@@ -161,6 +165,7 @@ def upload():
         "filename": dest.name,
         "num_clips": num_clips,
         "preset_id": preset_id,
+        "title_enabled": title_enabled,
     }
     with lock:
         dashboard_state["queued"].append({"video_id": video_id, "filename": dest.name})
@@ -218,12 +223,23 @@ def clips(filename):
     return send_from_directory(OUTPUT_DIR, filename)
 
 
-@app.route("/api/schedule", methods=["POST"])
-def schedule_clip():
+_PLATFORM_FIELDS = {
+    "tiktok": ("Post to TikTok", "Buffer Post ID - TikTok"),
+    "instagram_reels": ("Post to Instagram Reels", "Buffer Post ID - Instagram"),
+    "youtube_shorts": ("Post to YouTube Shorts", "Buffer Post ID - YouTube"),
+}
+
+
+@app.route("/api/ship", methods=["POST"])
+def ship_clip():
+    """Manual, per-clip action: upload to Cloudinary, post to every configured Buffer
+    channel, and log the result to Airtable - all in one click. Never triggered
+    automatically by the pipeline."""
     data = request.get_json()
     filename = data.get("filename")
     hook_title = data.get("hook_title", "")
     category = data.get("category", "highlight")
+    virality_score = data.get("virality_score", 0)
 
     if not filename:
         return jsonify({"error": "No filename provided"}), 400
@@ -232,13 +248,14 @@ def schedule_clip():
     if not clip_path.exists():
         return jsonify({"error": f"Clip not found: {filename}"}), 404
 
+    video_id, clip_id = (filename.rsplit(".", 1)[0].split("__", 2) + ["", ""])[:2]
+
     config = load_config()
-    channel_ids = config.get("buffer_channel_ids", [])
+    channel_ids = {p: cid for p, cid in config.get("buffer_channel_ids", {}).items() if cid}
     buffer_token = os.environ.get("BUFFER_ACCESS_TOKEN", "")
-    claude_model = config.get("claude_model", "claude-sonnet-4-6")
 
     if not channel_ids:
-        return jsonify({"error": "No buffer_channel_ids in config.json"}), 400
+        return jsonify({"error": "No Buffer channels configured in config.json"}), 400
     if not buffer_token:
         return jsonify({"error": "BUFFER_ACCESS_TOKEN not set in .env"}), 400
 
@@ -247,13 +264,49 @@ def schedule_clip():
             clip_path=clip_path,
             hook_title=hook_title,
             category=category,
-            channel_ids=channel_ids,
+            platform_channel_ids=channel_ids,
             buffer_token=buffer_token,
-            claude_model=claude_model,
         )
-        return jsonify({"success": True, **result})
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        return jsonify({"error": f"Cloudinary/Buffer step failed: {exc}"}), 500
+
+    fields = {
+        "Video ID": video_id,
+        "Clip ID": clip_id,
+        "Clip Filename": filename,
+        "Hook Title": hook_title,
+        "Category": category,
+        "Virality Score": virality_score,
+        "Clip Video": [{"url": result["cloudinary_url"]}],
+        "Clip URL": result["cloudinary_url"],
+    }
+    errors = []
+    for r in result["buffer_results"]:
+        checkbox_field, id_field = _PLATFORM_FIELDS.get(r["platform"], (None, None))
+        if checkbox_field:
+            fields[checkbox_field] = True
+        if "post" in r and id_field:
+            fields[id_field] = r["post"]["id"]
+        if "error" in r:
+            errors.append(f"{r['platform']}: {r['error']}")
+    fields["Status"] = "Failed" if errors else "Scheduled"
+    if errors:
+        fields["Sync Error"] = "; ".join(errors)
+
+    try:
+        airtable_client.ensure_clips_table()
+        record = airtable_client.create_record(fields)
+    except Exception as exc:
+        return jsonify({
+            "error": f"Posted to Buffer but Airtable logging failed: {exc}",
+            "buffer_results": result["buffer_results"],
+        }), 500
+
+    return jsonify({
+        "success": not errors,
+        "buffer_results": result["buffer_results"],
+        "airtable_record_id": record.get("id"),
+    })
 
 
 def _open_in_chrome(url: str) -> None:

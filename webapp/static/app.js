@@ -12,6 +12,7 @@ const numClipsInput = document.getElementById("num-clips");
 const uploadFlash = document.getElementById("upload-flash");
 const tally = document.getElementById("tally");
 const presetSelect = document.getElementById("preset-id");
+const titleEnabledInput = document.getElementById("title-enabled");
 
 const presetModal = document.getElementById("preset-modal");
 const btnManagePresets = document.getElementById("btn-manage-presets");
@@ -87,6 +88,7 @@ function uploadFile(file) {
   form.append("video", file);
   form.append("num_clips", numClipsInput.value || "6");
   form.append("preset_id", presetSelect.value || "");
+  form.append("title_enabled", titleEnabledInput.checked ? "true" : "false");
 
   flash(`Uploading ${file.name}…`, false);
 
@@ -216,7 +218,7 @@ function renderGallery(completed) {
             <p class="clip-hook">${clip.hook_title || ""}</p>
             <div class="clip-actions">
               <a class="clip-download" href="/clips/${encodeURIComponent(clip.filename)}" download title="Download">&darr;</a>
-              <button class="clip-schedule btn-schedule" data-filename="${clip.filename}" data-hook="${(clip.hook_title||"").replace(/"/g,"&quot;")}" data-category="${clip.category||"highlight"}">Schedule</button>
+              <button class="clip-ship btn-ship" data-filename="${clip.filename}" data-hook="${(clip.hook_title||"").replace(/"/g,"&quot;")}" data-category="${clip.category||"highlight"}" data-score="${clip.virality_score ?? 0}">Ship to Airtable + Buffer</button>
             </div>
           </div>
         </div>`
@@ -366,37 +368,55 @@ presetForm.addEventListener("submit", (e) => {
 
 loadPresets();
 
-// Schedule button — event delegation so it works after gallery re-renders
+// Ship button — event delegation so it works after gallery re-renders.
+// Manual only: uploads to Cloudinary, posts to every configured Buffer channel,
+// and logs the result to Airtable. Never triggered automatically.
 document.addEventListener("click", (e) => {
-  const btn = e.target.closest(".btn-schedule");
+  const btn = e.target.closest(".btn-ship");
   if (!btn) return;
 
   const filename = btn.dataset.filename;
   const hookTitle = btn.dataset.hook;
   const category = btn.dataset.category;
+  const viralityScore = Number(btn.dataset.score || 0);
 
   btn.disabled = true;
-  btn.textContent = "Uploading…";
+  btn.textContent = "Shipping…";
 
-  fetch("/api/schedule", {
+  fetch("/api/ship", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, hook_title: hookTitle, category }),
+    body: JSON.stringify({
+      filename,
+      hook_title: hookTitle,
+      category,
+      virality_score: viralityScore,
+    }),
   })
     .then((res) => res.json())
     .then((data) => {
       if (data.error) {
-        btn.textContent = "Error";
+        btn.disabled = false;
+        btn.textContent = "Error — retry";
         btn.title = data.error;
         btn.style.background = "#c0392b";
+      } else if (!data.success) {
+        btn.disabled = false;
+        btn.textContent = "Partial failure — retry";
+        btn.title = (data.buffer_results || [])
+          .filter((r) => r.error)
+          .map((r) => `${r.platform}: ${r.error}`)
+          .join("; ");
+        btn.style.background = "#c0392b";
       } else {
-        btn.textContent = "Scheduled ✓";
+        btn.textContent = "Shipped ✓";
         btn.style.background = "#27ae60";
-        btn.title = data.caption || "";
+        btn.title = (data.buffer_results || []).map((r) => r.platform).join(", ");
       }
     })
     .catch(() => {
-      btn.textContent = "Failed";
+      btn.disabled = false;
+      btn.textContent = "Failed — retry";
       btn.style.background = "#c0392b";
     });
 });

@@ -1,6 +1,4 @@
-import json
 import os
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import cloudinary
@@ -57,28 +55,53 @@ Rules:
     return msg.content[0].text.strip()
 
 
-def schedule_to_buffer(public_url: str, caption: str, channel_id: str,
-                        buffer_token: str, minutes_from_now: int = 15) -> dict:
-    scheduled_at = (
-        datetime.now(timezone.utc) + timedelta(minutes=minutes_from_now)
-    ).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    query = """
-    mutation CreatePost($input: PostCreateInput!) {
-        postCreate(input: $input) {
-            post { id status scheduledAt }
-            errors { message }
-        }
+# Confirmed 2026-07-08 via live GraphQL introspection against api.buffer.com/graphql
+# (scripts/buffer_introspect.py) - the mutation is `createPost`/`CreatePostInput`, NOT
+# `postCreate`/`PostCreateInput` (that mutation does not exist on Buffer's real schema).
+_CREATE_POST_MUTATION = """
+mutation CreatePost($input: CreatePostInput!) {
+    createPost(input: $input) {
+        ... on PostActionSuccess { post { id status dueAt } }
+        ... on InvalidInputError { message }
+        ... on UnauthorizedError { message }
+        ... on LimitReachedError { message }
+        ... on RestProxyError { message }
+        ... on UnexpectedError { message }
+        ... on NotFoundError { message }
     }
+}
+"""
+
+# Per-platform `metadata` block required/supported by Buffer's schema (confirmed via
+# introspection of PostInputMetaData / InstagramPostMetadataInput / TikTokPostMetadataInput /
+# YoutubePostMetadataInput). Instagram *requires* `type` + `shouldShareToFeed`; omitting
+# them causes a hard rejection. TikTok/YouTube fields are optional but worth setting.
+def _platform_metadata(platform: str, caption: str) -> dict:
+    if platform == "instagram_reels":
+        return {"instagram": {"type": "reel", "shouldShareToFeed": True}}
+    if platform == "tiktok":
+        return {"tiktok": {"title": caption[:150]}}
+    if platform == "youtube_shorts":
+        return {"youtube": {"title": caption[:100], "privacy": "public", "madeForKids": False}}
+    raise ValueError(f"Unknown platform: {platform}")
+
+
+def schedule_to_buffer(public_url: str, caption: str, channel_id: str, platform: str,
+                        buffer_token: str, scheduled_at: str | None = None) -> dict:
+    """Create a Buffer post for a video clip.
+
+    scheduled_at=None -> added to the channel's Buffer queue (safest default).
+    scheduled_at="YYYY-MM-DDTHH:MM:SSZ" -> scheduled for that exact time.
     """
     variables = {
         "input": {
             "channelId": channel_id,
-            "content": {
-                "text": caption,
-                "media": {"url": public_url},
-            },
-            "scheduledAt": scheduled_at,
+            "schedulingType": "automatic",
+            "mode": "addToQueue" if scheduled_at is None else "customScheduled",
+            "text": caption,
+            "assets": [{"video": {"url": public_url}}],
+            "metadata": _platform_metadata(platform, caption),
+            **({"dueAt": scheduled_at} if scheduled_at else {}),
         }
     }
     resp = requests.post(
@@ -87,25 +110,38 @@ def schedule_to_buffer(public_url: str, caption: str, channel_id: str,
             "Authorization": f"Bearer {buffer_token}",
             "Content-Type": "application/json",
         },
-        json={"query": query, "variables": variables},
+        json={"query": _CREATE_POST_MUTATION, "variables": variables},
         timeout=30,
     )
     resp.raise_for_status()
-    return resp.json()
+    data = resp.json()
+    if data.get("errors"):
+        raise RuntimeError(f"Buffer GraphQL error for channel {channel_id}: {data['errors']}")
+    result = data["data"]["createPost"]
+    if "message" in result:
+        raise RuntimeError(f"Buffer rejected post for channel {channel_id} ({platform}): {result['message']}")
+    return result["post"]
 
 
 def run(clip_path: Path, hook_title: str, category: str,
-        channel_ids: list[str], buffer_token: str, claude_model: str,
-        minutes_from_now: int = 15) -> dict:
+        platform_channel_ids: dict[str, str], buffer_token: str,
+        scheduled_at: str | None = None) -> dict:
+    """Ship one clip to Buffer for each platform in platform_channel_ids.
+
+    Uses the clip's hook_title directly as the caption - no AI caption generation.
+    """
     cloudinary_url = upload_to_cloudinary(clip_path)
-    caption = generate_caption(hook_title, category, claude_model)
+    caption = hook_title
 
     buffer_results = []
-    for channel_id in channel_ids:
-        result = schedule_to_buffer(
-            cloudinary_url, caption, channel_id, buffer_token, minutes_from_now
-        )
-        buffer_results.append({"channel_id": channel_id, "result": result})
+    for platform, channel_id in platform_channel_ids.items():
+        try:
+            post = schedule_to_buffer(
+                cloudinary_url, caption, channel_id, platform, buffer_token, scheduled_at
+            )
+            buffer_results.append({"platform": platform, "channel_id": channel_id, "post": post})
+        except Exception as exc:
+            buffer_results.append({"platform": platform, "channel_id": channel_id, "error": str(exc)})
 
     return {
         "cloudinary_url": cloudinary_url,

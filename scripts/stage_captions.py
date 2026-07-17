@@ -165,7 +165,8 @@ def _watermark_dialogue(text: str, clip_duration: float) -> str:
 
 def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: int, height: int,
               watermark_text: str = "", highlight_color: str | None = None,
-              base_color: str | None = None, watermark_position: str | None = None) -> str:
+              base_color: str | None = None, watermark_position: str | None = None,
+              title_enabled: bool = True) -> str:
     caption_fontsize = max(36, width // 14)
     title_fontsize = max(40, width // 12)
     watermark_fontsize = max(24, width // 36)
@@ -184,7 +185,9 @@ def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: i
         base_color=base_ass,
         watermark_alignment=watermark_alignment,
     )
-    dialogues = [_title_dialogue(hook_title, clip_duration, highlight_ass)] + _caption_dialogues(words)
+    dialogues = _caption_dialogues(words)
+    if title_enabled:
+        dialogues.insert(0, _title_dialogue(hook_title, clip_duration, highlight_ass))
     if watermark_text:
         dialogues.append(_watermark_dialogue(watermark_text, clip_duration))
     body = "\n".join(dialogues)
@@ -194,7 +197,7 @@ def build_ass(words: list[dict], hook_title: str, clip_duration: float, width: i
 def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[str],
         width: int, height: int, watermark_text: str = "", highlight_color: str | None = None,
         base_color: str | None = None, watermark_position: str | None = None,
-        force: bool = False) -> list[Path]:
+        title_enabled: bool = True, force: bool = False) -> list[Path]:
     work_dir = state.work_dir_for(video_id)
     output_dir = state.ROOT / "output"
     output_dir.mkdir(exist_ok=True)
@@ -212,7 +215,8 @@ def run(video_id: str, transcript: dict, candidates: list[dict], clip_ids: list[
 
         ass_content = build_ass(words, candidate["hook_title"], clip_duration, width, height,
                                 watermark_text=watermark_text, highlight_color=highlight_color,
-                                base_color=base_color, watermark_position=watermark_position)
+                                base_color=base_color, watermark_position=watermark_position,
+                                title_enabled=title_enabled)
         ass_path = clip_dir / "captions.ass"
         ass_path.write_text(ass_content, encoding="utf-8")
 

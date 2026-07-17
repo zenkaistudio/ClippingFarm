@@ -49,7 +49,26 @@ def probe(path: Path) -> dict:
     }
 
 
+def has_audio_stream(path: Path) -> bool:
+    cmd = [
+        FFPROBE, "-v", "error",
+        "-select_streams", "a",
+        "-show_entries", "stream=index",
+        "-of", "json",
+        str(path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe failed on {path}\n{result.stderr}")
+    return bool(json.loads(result.stdout).get("streams"))
+
+
 def extract_audio(video_path: Path, out_wav_path: Path) -> None:
+    if not has_audio_stream(video_path):
+        raise RuntimeError(
+            f"'{video_path.name}' has no audio track — nothing to transcribe. "
+            "Re-record with your microphone or system/computer audio enabled and re-upload."
+        )
     cmd = [
         FFMPEG, "-y", "-i", str(video_path),
         "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",

@@ -372,6 +372,25 @@ body {
 .upload-flash.show { opacity: 1; }
 .upload-flash.error { color: var(--tally-red); }
 
+.toggle-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--paper-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--amber);
+  cursor: pointer;
+}
+
 /* --- preset picker --- */
 
 .preset-picker {
@@ -977,7 +996,7 @@ body {
   gap: 8px;
 }
 
-.btn-schedule {
+.btn-ship {
   position: relative;
   overflow: hidden;
   flex-shrink: 0;
@@ -995,7 +1014,7 @@ body {
   white-space: nowrap;
 }
 
-.btn-schedule::after {
+.btn-ship::after {
   content: "";
   position: absolute;
   top: 0; left: -60%;
@@ -1005,10 +1024,10 @@ body {
   transition: left 0.5s ease;
 }
 
-.btn-schedule:hover:not(:disabled)::after { left: 130%; }
-.btn-schedule:hover:not(:disabled) { transform: scale(1.05); }
-.btn-schedule:active:not(:disabled) { transform: scale(0.92); }
-.btn-schedule:disabled { opacity: 0.7; cursor: default; }
+.btn-ship:hover:not(:disabled)::after { left: 130%; }
+.btn-ship:hover:not(:disabled) { transform: scale(1.05); }
+.btn-ship:active:not(:disabled) { transform: scale(0.92); }
+.btn-ship:disabled { opacity: 0.7; cursor: default; }
 
 .badge-emotional_peak { background: var(--cat-emotional); }
 .badge-punchline { background: var(--cat-punchline); }
