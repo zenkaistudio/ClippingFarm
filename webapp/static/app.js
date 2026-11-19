@@ -13,6 +13,7 @@ const uploadFlash = document.getElementById("upload-flash");
 const tally = document.getElementById("tally");
 const presetSelect = document.getElementById("preset-id");
 const titleEnabledInput = document.getElementById("title-enabled");
+const captionsEnabledInput = document.getElementById("captions-enabled");
 
 const presetModal = document.getElementById("preset-modal");
 const btnManagePresets = document.getElementById("btn-manage-presets");
@@ -89,6 +90,7 @@ function uploadFile(file) {
   form.append("num_clips", numClipsInput.value || "6");
   form.append("preset_id", presetSelect.value || "");
   form.append("title_enabled", titleEnabledInput.checked ? "true" : "false");
+  form.append("captions_enabled", captionsEnabledInput.checked ? "true" : "false");
 
   flash(`Uploading ${file.name}…`, false);
 

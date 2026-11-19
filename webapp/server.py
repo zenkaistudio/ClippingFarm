@@ -60,6 +60,7 @@ def _process_job(job: dict) -> None:
     base_color = preset["caption_base_color"]
     watermark_position = preset["watermark_position"]
     title_enabled = job.get("title_enabled", True)
+    captions_enabled = job.get("captions_enabled", True)
 
     with lock:
         dashboard_state["current"] = {
@@ -93,7 +94,7 @@ def _process_job(job: dict) -> None:
         final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
                                          watermark_text=watermark_text, highlight_color=highlight_color,
                                          base_color=base_color, watermark_position=watermark_position,
-                                         title_enabled=title_enabled)
+                                         title_enabled=title_enabled, captions_enabled=captions_enabled)
 
         clips = [
             {
@@ -147,6 +148,7 @@ def upload():
     num_clips = int(request.form.get("num_clips") or default_num_clips)
     preset_id = request.form.get("preset_id") or ""
     title_enabled = (request.form.get("title_enabled") or "true").lower() != "false"
+    captions_enabled = (request.form.get("captions_enabled") or "true").lower() != "false"
 
     dest = UPLOADS_DIR / file.filename
     stem, suffix = dest.stem, dest.suffix
@@ -166,6 +168,7 @@ def upload():
         "num_clips": num_clips,
         "preset_id": preset_id,
         "title_enabled": title_enabled,
+        "captions_enabled": captions_enabled,
     }
     with lock:
         dashboard_state["queued"].append({"video_id": video_id, "filename": dest.name})
@@ -323,5 +326,6 @@ def _open_in_chrome(url: str) -> None:
 
 
 if __name__ == "__main__":
-    threading.Timer(1.0, lambda: _open_in_chrome("http://127.0.0.1:5050")).start()
+    if not os.environ.get("ZENKAI_HUB"):  # the hub opens its own tab
+        threading.Timer(1.0, lambda: _open_in_chrome("http://127.0.0.1:5050")).start()
     app.run(host="127.0.0.1", port=5050, threaded=True)

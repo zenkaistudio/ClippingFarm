@@ -8,10 +8,18 @@ _FFMPEG_BUNDLED = _BUNDLED_DIR / "ffmpeg.exe"
 _FFPROBE_BUNDLED = _BUNDLED_DIR / "ffprobe.exe"
 _FFMPEG_MACOS_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg")
 _FFPROBE_MACOS_FULL = Path("/opt/homebrew/opt/ffmpeg-full/bin/ffprobe")
+# Standalone static build (martin-riedl.de) private to the farm, so Homebrew
+# library upgrades can never break it.
+_MAC_STATIC_DIR = Path(__file__).resolve().parent.parent / "tools" / "ffmpeg-mac" / "dl"
+_FFMPEG_MAC_STATIC = _MAC_STATIC_DIR / "ffmpeg"
+_FFPROBE_MAC_STATIC = _MAC_STATIC_DIR / "ffprobe"
 
 if _FFMPEG_BUNDLED.exists():
     FFMPEG = str(_FFMPEG_BUNDLED)
     FFPROBE = str(_FFPROBE_BUNDLED)
+elif _FFMPEG_MAC_STATIC.exists():
+    FFMPEG = str(_FFMPEG_MAC_STATIC)
+    FFPROBE = str(_FFPROBE_MAC_STATIC)
 elif _FFMPEG_MACOS_FULL.exists():
     FFMPEG = str(_FFMPEG_MACOS_FULL)
     FFPROBE = str(_FFPROBE_MACOS_FULL)

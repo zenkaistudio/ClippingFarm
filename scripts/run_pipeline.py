@@ -34,6 +34,7 @@ def main():
                          choices=["all", "transcribe", "detect_moments", "cut", "reframe", "captions"])
     parser.add_argument("--num-clips", type=int)
     parser.add_argument("--no-title", action="store_true", help="Burn in captions only, skip the hook title overlay")
+    parser.add_argument("--no-captions", action="store_true", help="Skip the word-by-word captions")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
 
@@ -97,6 +98,7 @@ def main():
             clip_ids = [f"clip{i + 1:02d}" for i in range(len(candidates))]
         final_paths = stage_captions.run(video_id, transcript, candidates, clip_ids, width, height,
                                          watermark_text=watermark_text, title_enabled=not args.no_title,
+                                         captions_enabled=not args.no_captions,
                                          force=args.force)
         print(f"[captions] wrote {len(final_paths)} final clips:")
         for p in final_paths:
